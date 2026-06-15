@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Stock Analyser</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#0d0f14;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+
+    header{background:#111318;border-bottom:1px solid #1e2130;padding:18px 40px;display:flex;align-items:center;gap:32px}
+    header h1{font-size:1.15rem;font-weight:700;color:#fff;white-space:nowrap}
+    .search-wrap{position:relative;flex:1;max-width:500px}
+    .search-bar{display:flex;gap:10px}
+    .search-bar input{flex:1;background:#1a1d27;border:1px solid #2a2d3e;color:#e2e8f0;padding:10px 16px;border-radius:8px;font-size:.93rem;outline:none;transition:border-color .2s}
+    .search-bar input:focus{border-color:#6366f1}
+    .search-bar input::placeholder{color:#4a5068}
+    .search-bar button{background:#6366f1;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:.93rem;font-weight:600;cursor:pointer;white-space:nowrap}
+    .search-bar button:hover{background:#5254cc}
+    .dropdown{position:absolute;top:calc(100% + 6px);left:0;right:0;background:#1a1d27;border:1px solid #2a2d3e;border-radius:8px;z-index:200;overflow:hidden;display:none;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+    .dropdown.open{display:block}
+    .dropdown-item{padding:10px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e2130}
+    .dropdown-item:last-child{border-bottom:none}
+    .dropdown-item:hover{background:#22253a}
+    .d-name{font-size:.88rem;color:#e2e8f0}.d-exchange{font-size:.72rem;color:#4a5068;margin-top:2px}.d-ticker{font-size:.78rem;color:#6366f1;font-weight:700;margin-left:12px}
+
+    .main{padding:28px 40px}
+
+    /* reco */
+    .reco-section{margin-bottom:32px}
+    .section-title{font-size:.75rem;color:#6b7280;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+    .refresh-btn{background:none;border:1px solid #2a2d3e;color:#6b7280;font-size:.72rem;padding:3px 10px;border-radius:6px;cursor:pointer}
+    .refresh-btn:hover{border-color:#6366f1;color:#6366f1}
+    .reco-loading{color:#4a5068;font-size:.85rem;padding:10px 0}
+    .reco-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+    .reco-col h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;font-weight:700}
+    .reco-col.buys h3{color:#34d399}.reco-col.sells h3{color:#f87171}
+    .reco-card{background:#111318;border:1px solid #1e2130;border-radius:10px;padding:13px 16px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:border-color .2s}
+    .reco-card:hover{border-color:#6366f1}
+    .rc-name{font-size:.87rem;color:#e2e8f0;font-weight:500}.rc-ticker{font-size:.73rem;color:#6366f1;margin-top:2px}
+    .rc-price{font-size:.9rem;color:#fff;font-weight:600;text-align:right}.rc-change{font-size:.73rem;margin-top:2px;text-align:right}
+    .rc-score{font-size:.7rem;font-weight:700;padding:3px 8px;border-radius:4px;margin-left:10px;white-space:nowrap}
+    .buys .rc-score{background:rgba(52,211,153,.15);color:#34d399}.sells .rc-score{background:rgba(248,113,113,.15);color:#f87171}
+    .up{color:#34d399}.down{color:#f87171}
+
+    .divider{border:none;border-top:1px solid #1e2130;margin:0 0 28px}
+    .reco-section-label{font-size:.72rem;color:#4a5068;text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;margin-top:4px}
+    .sector-divider{border-top:1px solid #1e2130;margin:24px 0}
+    .sector-grid{display:flex;flex-direction:column;gap:24px}
+    .sector-block{background:#0d0f14;border:1px solid #1e2130;border-radius:10px;padding:16px 18px}
+    .sector-name{font-size:.8rem;font-weight:700;color:#e2e8f0;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
+    .scanned-note{font-size:.7rem;color:#3a3f52;margin-top:16px;text-align:right}
+
+    .empty-state{display:flex;flex-direction:column;align-items:center;padding:50px 20px;color:#4a5068;text-align:center}
+    .empty-state .icon{font-size:2.2rem;margin-bottom:10px}
+    .error-box{background:#2d1515;border:1px solid #5c2020;color:#f87171;padding:12px 18px;border-radius:10px;margin-bottom:18px;font-size:.88rem}
+
+    /* top row */
+    .top-row{display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+    .stock-info{background:#111318;border:1px solid #1e2130;border-radius:12px;padding:22px 26px;flex:1;min-width:200px}
+    .company{color:#6b7280;font-size:.8rem;margin-bottom:4px}
+    .sector-tag{display:inline-block;font-size:.7rem;background:#1a1d27;color:#6b7280;padding:2px 8px;border-radius:4px;margin-bottom:8px}
+    .ticker-name{font-size:1.35rem;font-weight:700;color:#fff;margin-bottom:10px}
+    .price-big{font-size:1.9rem;font-weight:700;color:#fff}
+    .change-row{font-size:.9rem;margin-top:4px}
+
+    .signal-card{background:#111318;border:1px solid #1e2130;border-radius:12px;padding:22px 26px;min-width:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+    .signal-label-sm{font-size:.72rem;color:#6b7280;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+    .signal-badge{font-size:1.7rem;font-weight:800;padding:8px 26px;border-radius:10px;letter-spacing:.05em}
+    .signal-badge.BUY{background:rgba(52,211,153,.15);color:#34d399;border:2px solid #34d399}
+    .signal-badge.SELL{background:rgba(248,113,113,.15);color:#f87171;border:2px solid #f87171}
+    .signal-badge.HOLD{background:rgba(250,204,21,.15);color:#facc15;border:2px solid #facc15}
+    .score-text{margin-top:8px;font-size:.76rem;color:#6b7280}
+
+    .sentiment-card{background:#111318;border:1px solid #1e2130;border-radius:12px;padding:22px 26px;min-width:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+    .sent-label-sm{font-size:.72rem;color:#6b7280;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+    .sent-badge{font-size:1rem;font-weight:700;padding:8px 16px;border-radius:10px;margin-bottom:6px}
+    .sent-badge.Euphoric{background:rgba(52,211,153,.2);color:#34d399;border:1px solid #34d399}
+    .sent-badge.Accumulation{background:rgba(99,102,241,.2);color:#818cf8;border:1px solid #6366f1}
+    .sent-badge.Neutral{background:rgba(100,100,120,.15);color:#9ca3af;border:1px solid #374151}
+    .sent-badge.Caution{background:rgba(250,204,21,.15);color:#facc15;border:1px solid #facc15}
+    .sent-badge.Bearish{background:rgba(248,113,113,.15);color:#f87171;border:1px solid #f87171}
+    .sent-badge.Extreme-Fear{background:rgba(180,30,30,.25);color:#ef4444;border:1px solid #ef4444}
+    .sent-score{font-size:.78rem;color:#6b7280}
+
+    /* metrics */
+    .metrics-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+    .metric-card{background:#111318;border:1px solid #1e2130;border-radius:10px;padding:14px 18px}
+    .m-label{font-size:.72rem;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+    .m-value{font-size:1.15rem;font-weight:700;color:#fff}
+    .m-sub{font-size:.72rem;margin-top:3px}
+    .m-sub.bull{color:#34d399}.m-sub.bear{color:#f87171}.m-sub.neutral{color:#6b7280}
+    .sm-pill{display:inline-block;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px;margin-top:4px}
+    .sm-pill.Accumulation{background:rgba(52,211,153,.15);color:#34d399}
+    .sm-pill.Distribution{background:rgba(248,113,113,.15);color:#f87171}
+    .sm-pill.Weak-Rally,.sm-pill.Thin-Slide{background:rgba(250,204,21,.1);color:#facc15}
+
+    /* momentum multi-timeframe */
+    .mom-row{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+    .mom-card{background:#111318;border:1px solid #1e2130;border-radius:10px;padding:12px 16px;flex:1;min-width:80px;text-align:center}
+    .mom-period{font-size:.7rem;color:#6b7280;text-transform:uppercase;margin-bottom:4px}
+    .mom-val{font-size:1.1rem;font-weight:700}
+
+    /* reasons */
+    .reasons-card{background:#111318;border:1px solid #1e2130;border-radius:12px;padding:20px 24px;margin-bottom:20px}
+    .reasons-card h3{font-size:.75rem;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px}
+    .reason-item{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #1e2130;font-size:.88rem;line-height:1.5}
+    .reason-item:last-child{border-bottom:none}
+    .reason-cat{font-size:.68rem;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:4px;white-space:nowrap;margin-top:2px;flex-shrink:0}
+    .reason-cat.bullish{background:rgba(52,211,153,.12);color:#34d399}
+    .reason-cat.bearish{background:rgba(248,113,113,.12);color:#f87171}
+    .reason-cat.neutral{background:rgba(100,100,120,.12);color:#6b7280}
+    .reason-text{color:#cbd5e1}
+
+    /* fundamentals */
+    .funds-card{background:#111318;border:1px solid #1e2130;border-radius:12px;padding:20px 24px;margin-bottom:20px}
+    .funds-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+    .funds-header h3{font-size:.75rem;color:#6b7280;text-transform:uppercase;letter-spacing:.08em}
+    .edit-btn{background:none;border:1px solid #2a2d3e;color:#6b7280;font-size:.72rem;padding:4px 12px;border-radius:6px;cursor:pointer}
+    .edit-btn:hover{border-color:#6366f1;color:#6366f1}
+    .funds-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+    .fund-item{background:#0d0f14;border:1px solid #1e2130;border-radius:8px;padding:12px 14px}
+    .fund-label{font-size:.7rem;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+    .fund-value{font-size:1rem;font-weight:600;color:#fff}
+    .fund-value.missing{color:#3a3f52;font-style:italic;font-size:.82rem}
+    .fund-source{font-size:.65rem;margin-top:3px}
+    .fund-source.auto{color:#4a5068}.fund-source.manual{color:#6366f1}
+    .analyst-tag{display:inline-block;font-size:.75rem;font-weight:600;padding:3px 10px;border-radius:5px;margin-top:4px}
+    .analyst-tag.buy,.analyst-tag.strong_buy{background:rgba(52,211,153,.15);color:#34d399}
+    .analyst-tag.sell,.analyst-tag.strong_sell{background:rgba(248,113,113,.15);color:#f87171}
+    .analyst-tag.hold,.analyst-tag.neutral{background:rgba(250,204,21,.1);color:#facc15}
+
+    /* quarterly chart */
+    .quarterly-section{margin-top:16px}
+    .quarterly-section h4{font-size:.72rem;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+    .chart-wrapper-sm{position:relative;height:140px}
+
+    /* manual form */
+    .manual-form{display:none;margin-top:16px;border-top:1px solid #1e2130;padding-top:16px}
+    .manual-form.open{display:block}
+    .manual-form h4{font-size:.75rem;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
+    .form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:14px}
+    .form-group label{display:block;font-size:.72rem;color:#6b7280;margin-bottom:4px}
+    .form-group input{width:100%;background:#0d0f14;border:1px solid #2a2d3e;color:#e2e8f0;padding:7px 10px;border-radius:6px;font-size:.85rem;outline:none}
+    .form-group input:focus{border-color:#6366f1}
+    .form-group input::placeholder{color:#3a3f52}
+    .form-actions{display:flex;gap:10px}
+    .save-btn{background:#6366f1;color:#fff;border:none;padding:8px 18px;border-radius:7px;font-size:.85rem;font-weight:600;cursor:pointer}
+    .save-btn:hover{background:#5254cc}
+    .cancel-btn{background:none;border:1px solid #2a2d3e;color:#6b7280;padding:8px 18px;border-radius:7px;font-size:.85rem;cursor:pointer}
+    .save-confirm{font-size:.78rem;color:#34d399;display:none;margin-left:8px}
+
+    /* charts */
+    .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+    .chart-card{background:#111318;border:1px solid #1e2130;border-radius:12px;padding:20px}
+    .chart-card.full{grid-column:1/-1}
+    .chart-card h3{font-size:.75rem;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
+    .chart-wrapper{position:relative;height:190px}
+
+    .disclaimer{margin-top:20px;font-size:.7rem;color:#3a3f52;text-align:center;line-height:1.6}
+    #analysisContent{display:none}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📈 Stock Analyser</h1>
+  <div class="search-wrap">
+    <div class="search-bar">
+      <input type="text" id="tickerInput" placeholder="Search by company name or ticker…" autocomplete="off"/>
+      <button onclick="analyseSelected()">Analyse</button>
+    </div>
+    <div class="dropdown" id="dropdown"></div>
+  </div>
+</header>
+
+<div class="main">
+  <div class="reco-section">
+    <div class="section-title">Today's signals <button class="refresh-btn" onclick="loadRecommendations(true)">↻ Refresh</button></div>
+    <div id="recoContent"><div class="reco-loading">Scanning stocks…</div></div>
+  </div>
+  <hr class="divider"/>
+
+  <div id="emptyState" class="empty-state">
+    <div class="icon">🔍</div>
+    <p>Search a company above to analyse it</p>
+    <small>Or click any signal card above</small>
+  </div>
+  <div id="errorBox" class="error-box" style="display:none"></div>
+
+  <div id="analysisContent">
+    <!-- Top row -->
+    <div class="top-row">
+      <div class="stock-info">
+        <div class="company" id="companyName"></div>
+        <div id="sectorTag"></div>
+        <div class="ticker-name" id="tickerDisplay"></div>
+        <div class="price-big" id="priceDisplay"></div>
+        <div class="change-row" id="changeDisplay"></div>
+      </div>
+      <div class="signal-card">
+        <div class="signal-label-sm">Signal</div>
+        <div class="signal-badge" id="signalBadge"></div>
+        <div class="score-text" id="scoreText"></div>
+      </div>
+      <div class="sentiment-card">
+        <div class="sent-label-sm">Sentiment</div>
+        <div class="sent-badge" id="sentBadge"></div>
+        <div class="sent-score" id="sentScore"></div>
+      </div>
+    </div>
+
+    <!-- Multi-timeframe returns -->
+    <div class="mom-row" id="momRow"></div>
+
+    <!-- Metrics -->
+    <div class="metrics-grid">
+      <div class="metric-card"><div class="m-label">RSI (14)</div><div class="m-value" id="m-rsi">—</div><div class="m-sub" id="m-rsi-sub"></div></div>
+      <div class="metric-card"><div class="m-label">MFI</div><div class="m-value" id="m-mfi">—</div><div class="m-sub" id="m-mfi-sub"></div></div>
+      <div class="metric-card"><div class="m-label">OBV Trend</div><div class="m-value" id="m-obv">—</div><div class="m-sub" id="m-obv-sub"></div></div>
+      <div class="metric-card"><div class="m-label">Smart Money</div><div class="m-value" id="m-sm" style="font-size:.9rem"></div><div class="m-sub" id="m-sm-sub"></div></div>
+      <div class="metric-card"><div class="m-label">Rel. Volume</div><div class="m-value" id="m-rvol">—</div><div class="m-sub" id="m-rvol-sub"></div></div>
+      <div class="metric-card"><div class="m-label">50-Day MA</div><div class="m-value" id="m-sma50">—</div><div class="m-sub" id="m-sma50-sub"></div></div>
+      <div class="metric-card"><div class="m-label">200-Day MA</div><div class="m-value" id="m-sma200">—</div><div class="m-sub" id="m-sma200-sub"></div></div>
+    </div>
+
+    <!-- Reasons -->
+    <div class="reasons-card">
+      <h3>Why this signal?</h3>
+      <div id="reasonsList"></div>
+    </div>
+
+    <!-- Fundamentals -->
+    <div class="funds-card">
+      <div class="funds-header">
+        <h3>Fundamentals</h3>
+        <button class="edit-btn" onclick="toggleForm()">✏️ Edit / Add manually</button>
+      </div>
+      <div class="funds-grid" id="fundsGrid"></div>
+      <div class="quarterly-section" id="quarterlySection" style="display:none">
+        <h4>Quarterly Revenue &amp; Net Income</h4>
+        <div class="chart-wrapper-sm"><canvas id="quarterlyChart"></canvas></div>
+      </div>
+      <!-- Manual form -->
+      <div class="manual-form" id="manualForm">
+        <h4>Manual override — enter any values you have from the report</h4>
+        <div class="form-grid">
+          <div class="form-group"><label>P/E Ratio</label><input id="f-pe" placeholder="e.g. 25.4"/></div>
+          <div class="form-group"><label>Forward P/E</label><input id="f-fpe" placeholder="e.g. 20.1"/></div>
+          <div class="form-group"><label>EPS (TTM)</label><input id="f-eps" placeholder="e.g. 6.13"/></div>
+          <div class="form-group"><label>Revenue last quarter (€/$ millions)</label><input id="f-rev" placeholder="e.g. 24500"/></div>
+          <div class="form-group"><label>Net Income last quarter (millions)</label><input id="f-ni" placeholder="e.g. 3200"/></div>
+          <div class="form-group"><label>Profit Margin (%)</label><input id="f-pm" placeholder="e.g. 21.5"/></div>
+          <div class="form-group"><label>Revenue Growth YoY (%)</label><input id="f-rg" placeholder="e.g. 8.3"/></div>
+          <div class="form-group"><label>Debt / Equity Ratio</label><input id="f-de" placeholder="e.g. 1.2"/></div>
+          <div class="form-group"><label>Free Cash Flow (millions)</label><input id="f-fcf" placeholder="e.g. 5400"/></div>
+          <div class="form-group"><label>Return on Equity (%)</label><input id="f-roe" placeholder="e.g. 15.2"/></div>
+          <div class="form-group"><label>Analyst Target Price</label><input id="f-target" placeholder="e.g. 210"/></div>
+          <div class="form-group"><label>Analyst Rating</label><input id="f-rating" placeholder="buy / hold / sell"/></div>
+        </div>
+        <div class="form-actions">
+          <button class="save-btn" onclick="saveFundamentals()">Save</button>
+          <button class="cancel-btn" onclick="toggleForm()">Cancel</button>
+          <span class="save-confirm" id="saveConfirm">✓ Saved</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+      <div class="chart-card full"><h3>Price + Moving Averages — 90 days</h3><div class="chart-wrapper"><canvas id="priceChart"></canvas></div></div>
+      <div class="chart-card"><h3>RSI</h3><div class="chart-wrapper"><canvas id="rsiChart"></canvas></div></div>
+      <div class="chart-card"><h3>MFI — Money Flow</h3><div class="chart-wrapper"><canvas id="mfiChart"></canvas></div></div>
+      <div class="chart-card"><h3>MACD</h3><div class="chart-wrapper"><canvas id="macdChart"></canvas></div></div>
+      <div class="chart-card"><h3>OBV — On-Balance Volume</h3><div class="chart-wrapper"><canvas id="obvChart"></canvas></div></div>
+    </div>
+
+    <p class="disclaimer">Technical indicators only (RSI, MACD, MFI, OBV, RVOL, MA). Does not predict the future. Data delayed ~15 min. Not financial advice.</p>
+  </div>
+</div>
+
+<script>
+  let charts = {}, selectedTicker = '', searchTimeout = null, currentTicker = '';
+  const input = document.getElementById('tickerInput');
+  const dropdown = document.getElementById('dropdown');
+
+  input.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    const q = input.value.trim();
+    if (q.length < 2) { closeDropdown(); return; }
+    searchTimeout = setTimeout(() => fetchSuggestions(q), 280);
+  });
+  input.addEventListener('keydown', e => { if (e.key==='Enter') analyseSelected(); if (e.key==='Escape') closeDropdown(); });
+  document.addEventListener('click', e => { if (!e.target.closest('.search-wrap')) closeDropdown(); });
+
+  async function fetchSuggestions(q) {
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const items = await res.json();
+      if (!items.length) { closeDropdown(); return; }
+      dropdown.innerHTML = items.map(i => `
+        <div class="dropdown-item" onclick="selectTicker('${esc(i.ticker)}','${esc(i.name)}')">
+          <div><div class="d-name">${esc(i.name)}</div><div class="d-exchange">${esc(i.exchange)}</div></div>
+          <div class="d-ticker">${i.ticker}</div>
+        </div>`).join('');
+      dropdown.classList.add('open');
+    } catch { closeDropdown(); }
+  }
+
+  function selectTicker(ticker, name) { selectedTicker = ticker; input.value = name; closeDropdown(); analyseByTicker(ticker); }
+  function closeDropdown() { dropdown.classList.remove('open'); dropdown.innerHTML = ''; }
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function analyseSelected() { const v = input.value.trim(); if (v) analyseByTicker(selectedTicker || v.toUpperCase()); }
+
+  // RECO
+  async function loadRecommendations(force=false) {
+    document.getElementById('recoContent').innerHTML = '<div class="reco-loading">Scanning 100 stocks…</div>';
+    try {
+      const data = await (await fetch('/api/recommendations'+(force?'?force=1':''))).json();
+
+      // Overall
+      const ob = data.buys.map(r=>recoCard(r,'buys')).join('') || '<div class="reco-loading">No strong buy signals.</div>';
+      const os = data.sells.map(r=>recoCard(r,'sells')).join('') || '<div class="reco-loading">No strong sell signals.</div>';
+      let html = `
+        <div class="reco-section-label">Overall — Top signals across all 100 stocks</div>
+        <div class="reco-grid">${recoCol('buys','🟢 Top 5 Buys',ob)}${recoCol('sells','🔴 Top 5 Sells',os)}</div>
+        <div class="sector-divider"></div>
+        <div class="reco-section-label">By sector</div>
+        <div class="sector-grid">`;
+
+      const sectorOrder = ['Tech','Pharma','Finance','Consumer','Energy','Industrial','Auto','Telecom','Other'];
+      const sorted = sectorOrder.filter(s => data.sectors[s]).concat(Object.keys(data.sectors).filter(s=>!sectorOrder.includes(s)));
+
+      for (const sector of sorted) {
+        const sv = data.sectors[sector];
+        if (!sv) continue;
+        const sb = sv.buys.map(r=>recoCard(r,'buys')).join('') || '<div class="reco-loading">—</div>';
+        const ss = sv.sells.map(r=>recoCard(r,'sells')).join('') || '<div class="reco-loading">—</div>';
+        html += `<div class="sector-block">
+          <div class="sector-name">${sector}</div>
+          <div class="reco-grid">${recoCol('buys','🟢 Buys',sb)}${recoCol('sells','🔴 Sells',ss)}</div>
+        </div>`;
+      }
+      html += `</div><div class="scanned-note">Scanned ${data.scanned} stocks</div>`;
+      document.getElementById('recoContent').innerHTML = html;
+    } catch { document.getElementById('recoContent').innerHTML = '<div class="reco-loading">Could not load.</div>'; }
+  }
+
+  function recoCol(type, title, innerHtml) {
+    return `<div class="reco-col ${type}"><h3>${title}</h3>${innerHtml}</div>`;
+  }
+
+  function recoCard(r, type) {
+    const sign = r.price_change>=0?'+':''; const cls = r.price_change>=0?'up':'down';
+    return `<div class="reco-card" onclick="analyseByTicker('${r.ticker}')">
+      <div><div class="rc-name">${esc(r.name)}</div><div class="rc-ticker">${r.ticker}</div></div>
+      <div style="display:flex;align-items:center">
+        <div><div class="rc-price">${r.currency} ${r.price.toLocaleString()}</div><div class="rc-change ${cls}">${sign}${r.price_change.toFixed(2)}%</div></div>
+        <div class="rc-score">${type==='buys'?'+':''}${r.score}</div>
+      </div></div>`;
+  }
+
+  // ANALYSIS
+  async function analyseByTicker(ticker) {
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('errorBox').style.display = 'none';
+    document.getElementById('analysisContent').style.display = 'none';
+    currentTicker = ticker;
+    try {
+      const data = await (await fetch(`/api/analyze?ticker=${encodeURIComponent(ticker)}`)).json();
+      if (data.error) { document.getElementById('errorBox').textContent = data.error; document.getElementById('errorBox').style.display='block'; return; }
+      renderData(data);
+      document.getElementById('analysisContent').style.display = 'block';
+      document.getElementById('analysisContent').scrollIntoView({behavior:'smooth',block:'start'});
+    } catch { document.getElementById('errorBox').textContent='Something went wrong.'; document.getElementById('errorBox').style.display='block'; }
+  }
+
+  function set(id, val) { const el=document.getElementById(id); if(el) el.textContent = val??'—'; }
+  function setSub(id, text, cls) { const el=document.getElementById(id); if(!el)return; el.textContent=text; el.className='m-sub '+(cls||'neutral'); }
+
+  function renderData(d) {
+    set('companyName', d.name);
+    set('tickerDisplay', d.ticker);
+    set('priceDisplay', `${d.currency} ${d.price.toLocaleString()}`);
+    const sign = d.price_change>=0?'+':'';
+    const changeEl = document.getElementById('changeDisplay');
+    changeEl.textContent = `${sign}${d.price_change.toFixed(2)}% today`;
+    changeEl.className = 'change-row '+(d.price_change>=0?'up':'down');
+
+    // Sector
+    const f = d.fundamentals?.merged;
+    const stag = document.getElementById('sectorTag');
+    if (f?.sector) { stag.textContent = `${f.sector}${f.industry?' · '+f.industry:''}`; stag.style.display='inline-block'; } else stag.style.display='none';
+
+    // Signal
+    const badge = document.getElementById('signalBadge');
+    badge.textContent = d.signal; badge.className = 'signal-badge '+d.signal;
+    set('scoreText', `Conviction ${d.score} / ${d.max_score}`);
+
+    // Sentiment
+    const sb = document.getElementById('sentBadge');
+    const sl = d.sentiment_label || 'Neutral';
+    sb.textContent = sl; sb.className = 'sent-badge '+sl.replace(' ','-');
+    set('sentScore', d.sentiment_score != null ? `Score ${d.sentiment_score.toFixed(2)}` : '');
+
+    // Momentum row
+    const periods = [['1M','1M'],['3M','3M'],['6M','6M'],['1Y','1Y']];
+    document.getElementById('momRow').innerHTML = periods.map(([k,label]) => {
+      const v = d.mom?.[k]; const cls = v==null?'neutral':v>0?'up':'down';
+      return `<div class="mom-card"><div class="mom-period">${label}</div><div class="mom-val ${cls}">${v!=null?(v>0?'+':'')+v.toFixed(1)+'%':'—'}</div></div>`;
+    }).join('');
+
+    // Metrics
+    set('m-rsi', d.rsi??'—');
+    if(d.rsi) setSub('m-rsi-sub', d.rsi<30?'Oversold':d.rsi>70?'Overbought':'Neutral', d.rsi<30?'bull':d.rsi>70?'bear':'neutral');
+    set('m-mfi', d.mfi??'—');
+    if(d.mfi) setSub('m-mfi-sub', d.mfi<20?'Extreme oversold':d.mfi<40?'Weak flow':d.mfi>80?'Extreme overbought':d.mfi>60?'Strong flow':'Neutral', d.mfi<40?'bull':d.mfi>60?'bear':'neutral');
+    const obvLabel = d.obv_dir===1?'Accumulation':d.obv_dir===-1?'Distribution':'Neutral';
+    set('m-obv', obvLabel);
+    setSub('m-obv-sub', d.obv_dir===1?'Institutions buying':d.obv_dir===-1?'Institutions selling':'No clear direction', d.obv_dir===1?'bull':d.obv_dir===-1?'bear':'neutral');
+    document.getElementById('m-sm').innerHTML = `<span class="sm-pill ${d.sm_signal?.replace(' ','-')}">${d.sm_signal||'—'}</span>`;
+    setSub('m-sm-sub', `RVOL ${d.rvol??'—'}x vs 20d avg`, 'neutral');
+    set('m-rvol', d.rvol?`${d.rvol}x`:'—');
+    setSub('m-rvol-sub', d.rvol>=1.5?'Very high activity':d.rvol>=1.2?'Above average':'Below average', d.rvol>=1.2?'bull':'neutral');
+    set('m-sma50', d.sma50??'—');
+    if(d.sma50) setSub('m-sma50-sub', d.price>d.sma50?'▲ Price above':'▼ Price below', d.price>d.sma50?'bull':'bear');
+    set('m-sma200', d.sma200??'—');
+    if(d.sma200) setSub('m-sma200-sub', d.price>d.sma200?'▲ Price above':'▼ Price below', d.price>d.sma200?'bull':'bear');
+
+    // Reasons
+    document.getElementById('reasonsList').innerHTML = d.reasons.map(r=>`
+      <div class="reason-item">
+        <span class="reason-cat ${r.direction}">${r.category}</span>
+        <span class="reason-text">${r.text}</span>
+      </div>`).join('');
+
+    // Fundamentals
+    renderFundamentals(d.fundamentals, d.currency);
+
+    // Charts
+    renderCharts(d);
+
+    // Pre-fill manual form
+    prefillForm(d.fundamentals?.manual||{});
+  }
+
+  function fmtPct(v) { if(v==null)return null; return (v*100).toFixed(1)+'%'; }
+  function fmtLarge(n) {
+    if(n==null)return null;
+    if(Math.abs(n)>=1e12)return (n/1e12).toFixed(2)+'T';
+    if(Math.abs(n)>=1e9) return (n/1e9).toFixed(2)+'B';
+    if(Math.abs(n)>=1e6) return (n/1e6).toFixed(2)+'M';
+    return n.toLocaleString();
+  }
+
+  function renderFundamentals(funds, currency) {
+    const m = funds?.merged || {};
+    const auto = funds?.auto || {};
+    const manual = funds?.manual || {};
+    const isManual = k => manual[k] != null && manual[k] !== '';
+
+    function fundItem(label, key, value, fmt) {
+      const display = value != null ? (fmt?fmt(value):value) : null;
+      const src = isManual(key) ? '<span class="fund-source manual">✏ manual</span>' : (auto[key]!=null?'<span class="fund-source auto">auto</span>':'');
+      return `<div class="fund-item">
+        <div class="fund-label">${label}</div>
+        <div class="fund-value ${display==null?'missing':''}">${display??'not available'}</div>
+        ${src}
+      </div>`;
+    }
+
+    const analystRating = m.analyst_rating;
+    const ratingHtml = analystRating ? `<div class="fund-item">
+      <div class="fund-label">Analyst Rating</div>
+      <div><span class="analyst-tag ${analystRating}">${analystRating.replace('_',' ').toUpperCase()}</span></div>
+      ${isManual('analyst_rating')?'<span class="fund-source manual">✏ manual</span>':'<span class="fund-source auto">auto</span>'}
+    </div>` : fundItem('Analyst Rating','analyst_rating',null);
+
+    document.getElementById('fundsGrid').innerHTML =
+      fundItem('Market Cap','market_cap', m.market_cap, fmtLarge) +
+      fundItem('P/E Ratio','pe_ratio', m.pe_ratio, v=>v?.toFixed(1)) +
+      fundItem('Forward P/E','forward_pe', m.forward_pe, v=>v?.toFixed(1)) +
+      fundItem('EPS (TTM)','eps', m.eps, v=>`${currency} ${v?.toFixed(2)}`) +
+      fundItem('Revenue','revenue', m.revenue, fmtLarge) +
+      fundItem('Profit Margin','profit_margin', m.profit_margin, fmtPct) +
+      fundItem('Revenue Growth YoY','revenue_growth', m.revenue_growth, fmtPct) +
+      fundItem('Debt / Equity','debt_equity', m.debt_equity, v=>v?.toFixed(2)) +
+      fundItem('Free Cash Flow','free_cashflow', m.free_cashflow, fmtLarge) +
+      fundItem('Return on Equity','roe', m.roe, fmtPct) +
+      fundItem('Analyst Target','analyst_target', m.analyst_target, v=>`${currency} ${v}`) +
+      ratingHtml;
+
+    // Quarterly chart
+    const q = funds?.quarterly || [];
+    const qsec = document.getElementById('quarterlySection');
+    if (q.length > 0) {
+      qsec.style.display = 'block';
+      renderQuarterly(q, currency);
+    } else { qsec.style.display = 'none'; }
+  }
+
+  let quarterlyChart;
+  function renderQuarterly(q, currency) {
+    if (quarterlyChart) { quarterlyChart.destroy(); }
+    const labels = q.map(x=>x.period).reverse();
+    const rev = q.map(x=>x.revenue!=null?Math.round(x.revenue/1e6):null).reverse();
+    const ni  = q.map(x=>x.net_income!=null?Math.round(x.net_income/1e6):null).reverse();
+    quarterlyChart = new Chart(document.getElementById('quarterlyChart'), {
+      type:'bar',
+      data:{labels, datasets:[
+        {label:'Revenue (M)',data:rev,backgroundColor:'rgba(99,102,241,.6)',borderRadius:4},
+        {label:'Net Income (M)',data:ni,backgroundColor:'rgba(52,211,153,.5)',borderRadius:4},
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#6b7280',font:{size:10},boxWidth:10}}},
+        scales:{x:{ticks:{color:'#4a5068',font:{size:9}},grid:{color:'#1a1d27'}},y:{ticks:{color:'#4a5068',font:{size:9}},grid:{color:'#1a1d27'}}}}
+    });
+  }
+
+  // Manual form
+  function toggleForm() {
+    const form = document.getElementById('manualForm');
+    form.classList.toggle('open');
+  }
+
+  function prefillForm(manual) {
+    const map = {pe_ratio:'f-pe',forward_pe:'f-fpe',eps:'f-eps',revenue:'f-rev',net_income:'f-ni',profit_margin:'f-pm',revenue_growth:'f-rg',debt_equity:'f-de',free_cashflow:'f-fcf',roe:'f-roe',analyst_target:'f-target',analyst_rating:'f-rating'};
+    for (const [key,id] of Object.entries(map)) {
+      const el = document.getElementById(id);
+      if (el) el.value = manual[key]!=null ? manual[key] : '';
+    }
+  }
+
+  async function saveFundamentals() {
+    const pct = v => v ? parseFloat(v)/100 : null;
+    const num = v => v ? parseFloat(v) : null;
+    const mil = v => v ? parseFloat(v)*1e6 : null;
+    const str = v => v || null;
+    const payload = {
+      pe_ratio: num(document.getElementById('f-pe').value),
+      forward_pe: num(document.getElementById('f-fpe').value),
+      eps: num(document.getElementById('f-eps').value),
+      revenue: mil(document.getElementById('f-rev').value),
+      net_income: mil(document.getElementById('f-ni').value),
+      profit_margin: pct(document.getElementById('f-pm').value),
+      revenue_growth: pct(document.getElementById('f-rg').value),
+      debt_equity: num(document.getElementById('f-de').value),
+      free_cashflow: mil(document.getElementById('f-fcf').value),
+      roe: pct(document.getElementById('f-roe').value),
+      analyst_target: num(document.getElementById('f-target').value),
+      analyst_rating: str(document.getElementById('f-rating').value),
+    };
+    await fetch(`/api/fundamentals/${currentTicker}`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const conf = document.getElementById('saveConfirm');
+    conf.style.display = 'inline';
+    setTimeout(() => { conf.style.display='none'; document.getElementById('manualForm').classList.remove('open'); analyseByTicker(currentTicker); }, 1500);
+  }
+
+  // Charts
+  const cOpts = {
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#6b7280',font:{size:10},boxWidth:10}}},
+    scales:{x:{ticks:{color:'#4a5068',maxTicksLimit:7,font:{size:9}},grid:{color:'#1a1d27'}},y:{ticks:{color:'#4a5068',font:{size:9}},grid:{color:'#1a1d27'}}}
+  };
+
+  function renderCharts(d) {
+    ['price','rsi','mfi','macd','obv'].forEach(k=>{if(charts[k]){charts[k].destroy();delete charts[k];}});
+    const L = d.chart.dates;
+    charts.price = new Chart(document.getElementById('priceChart'),{type:'line',data:{labels:L,datasets:[
+      {label:'Price',data:d.chart.prices,borderColor:'#6366f1',borderWidth:2,pointRadius:0,tension:.3,fill:false},
+      {label:'50 MA',data:d.chart.sma50,borderColor:'#f59e0b',borderWidth:1.5,pointRadius:0,tension:.3,fill:false,borderDash:[4,3]},
+      {label:'200 MA',data:d.chart.sma200,borderColor:'#f87171',borderWidth:1.5,pointRadius:0,tension:.3,fill:false,borderDash:[4,3]},
+    ]},options:{...cOpts}});
+    charts.rsi = new Chart(document.getElementById('rsiChart'),{type:'line',data:{labels:L,datasets:[{label:'RSI',data:d.chart.rsi,borderColor:'#a78bfa',borderWidth:2,pointRadius:0,tension:.3,fill:false}]},options:{...cOpts,scales:{...cOpts.scales,y:{...cOpts.scales.y,min:0,max:100}}}});
+    charts.mfi = new Chart(document.getElementById('mfiChart'),{type:'line',data:{labels:L,datasets:[{label:'MFI',data:d.chart.mfi,borderColor:'#38bdf8',borderWidth:2,pointRadius:0,tension:.3,fill:false}]},options:{...cOpts,scales:{...cOpts.scales,y:{...cOpts.scales.y,min:0,max:100}}}});
+    const hc = d.chart.macd_hist.map(v=>v===null?'transparent':v>=0?'rgba(52,211,153,.6)':'rgba(248,113,113,.6)');
+    charts.macd = new Chart(document.getElementById('macdChart'),{type:'bar',data:{labels:L,datasets:[
+      {label:'Histogram',data:d.chart.macd_hist,backgroundColor:hc,borderWidth:0,order:2},
+      {label:'MACD',data:d.chart.macd,borderColor:'#6366f1',borderWidth:2,pointRadius:0,tension:.3,type:'line',fill:false,order:1},
+      {label:'Signal',data:d.chart.macd_signal,borderColor:'#f59e0b',borderWidth:1.5,pointRadius:0,tension:.3,type:'line',fill:false,borderDash:[4,3],order:0},
+    ]},options:{...cOpts}});
+    charts.obv = new Chart(document.getElementById('obvChart'),{type:'line',data:{labels:L,datasets:[{label:'OBV',data:d.chart.obv,borderColor:'#34d399',borderWidth:2,pointRadius:0,tension:.3,fill:false}]},options:{...cOpts}});
+  }
+
+  loadRecommendations();
+</script>
+</body>
+</html>
