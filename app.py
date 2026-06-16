@@ -314,6 +314,9 @@ def compute_signal(ticker):
         df = enrich_df(df)
         sig = build_signals(df)
         cur = df['Close'].iloc[-1]; prev = df['Close'].iloc[-2]
+        # Skip tickers with broken / missing price data
+        if cur is None or prev is None or math.isnan(cur) or math.isnan(prev) or prev == 0:
+            return None
         try:
             info = stock.info
             name = info.get('longName') or info.get('shortName') or ticker
